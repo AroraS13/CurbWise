@@ -1,0 +1,1508 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CurbWise — NYC Street Parking Research</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <style>
+    :root {
+      --navy: #172642;
+      --blue: #356DF3;
+      --teal: #0DAF98;
+      --amber: #F3AB47;
+      --coral: #DF5A67;
+      --ink: #172642;
+      --muted: #5b6b86;
+      --line: #d7deea;
+      --paper: #eef2f8;
+      --panel: #ffffff;
+      --accent: #356DF3;
+      --accent-soft: #e8effe;
+      --promising: #0DAF98;
+      --conditional: #F3AB47;
+      --avoid: #DF5A67;
+      --shadow: 0 1px 2px rgba(23, 38, 66, 0.06), 0 12px 28px rgba(23, 38, 66, 0.08);
+      --radius: 12px;
+      --sidebar-w: 380px;
+      --drawer-w: 400px;
+      --header-h: auto;
+      --font: "DM Sans", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+      --z-drawer: 1200;
+      --z-sheet: 1300;
+      --z-modal: 1400;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 480px at 12% -10%, rgba(53, 109, 243, 0.16), transparent 60%),
+        radial-gradient(900px 420px at 90% 0%, rgba(13, 175, 152, 0.12), transparent 55%),
+        var(--paper);
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100dvh;
+      max-height: 100dvh;
+      width: 100%;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* —— Header —— */
+    .topbar {
+      z-index: 30;
+      background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(255,255,255,0.92));
+      border-bottom: 1px solid var(--line);
+      padding: 0.7rem 1rem 0.8rem;
+      min-width: 0;
+      backdrop-filter: blur(8px);
+    }
+    .topbar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.6rem;
+    }
+    .brand {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--navy);
+      flex: 0 0 auto;
+      line-height: 1.15;
+    }
+    .brand span {
+      display: inline-block;
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 0.78rem;
+      margin-left: 0.45rem;
+      letter-spacing: 0;
+    }
+    form#search {
+      display: grid;
+      grid-template-columns: minmax(11rem, 2.2fr) repeat(5, minmax(6.2rem, 1fr)) auto;
+      gap: 0.5rem;
+      align-items: end;
+      min-width: 0;
+      width: 100%;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.22rem;
+      min-width: 0;
+      position: relative;
+    }
+    .field.dest, .field.date, .field.time, .field.dur, .field.vehicle, .field.rad { min-width: 0; }
+    .field label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+    .field input, .field select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.5rem 0.65rem;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      background: #fff;
+      color: var(--ink);
+      height: 2.4rem;
+    }
+    .field select {
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position: calc(100% - 14px) 55%, calc(100% - 9px) 55%;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      padding-right: 1.6rem;
+    }
+    .field input:focus, .field select:focus {
+      outline: 2px solid color-mix(in srgb, var(--blue) 40%, white);
+      border-color: var(--blue);
+    }
+    #run {
+      flex: 0 0 auto;
+      background: linear-gradient(180deg, #4a7dff, var(--blue));
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0.52rem 1.15rem;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      height: 2.4rem;
+      box-shadow: 0 8px 18px rgba(53, 109, 243, 0.28);
+    }
+    #run:hover { filter: brightness(1.05); }
+    #run:disabled { opacity: 0.45; cursor: not-allowed; filter: none; box-shadow: none; }
+    .time-row { display: flex; gap: 0.3rem; }
+    .time-row input { min-width: 0; flex: 1; }
+    .now-btn {
+      border: 1px solid var(--line); background: #fff; color: var(--blue);
+      border-radius: 9px; padding: 0 0.5rem; font: inherit; font-size: 0.72rem;
+      font-weight: 700; cursor: pointer;
+    }
+    .header-actions {
+      display: flex;
+      gap: 0.4rem;
+      flex: 0 0 auto;
+    }
+    .ghost-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 0.45rem 0.75rem;
+      font: inherit;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .ghost-btn:hover, .ghost-btn[aria-expanded="true"] {
+      color: var(--navy);
+      border-color: color-mix(in srgb, var(--blue) 45%, var(--line));
+      background: var(--accent-soft);
+    }
+    .suggest {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0; right: 0;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      z-index: 60;
+      max-height: 220px;
+      overflow: auto;
+      display: none;
+    }
+    .suggest.open { display: block; }
+    .suggest button {
+      display: block; width: 100%; text-align: left;
+      padding: 0.5rem 0.65rem; border: none; background: transparent;
+      cursor: pointer; font: inherit; font-size: 0.85rem;
+    }
+    .suggest button:hover { background: var(--accent-soft); }
+
+    /* —— Main: sidebar + map —— */
+    .workspace {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .sidebar {
+      min-width: 0;
+      min-height: 0;
+      border-right: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel) 92%, #e8eef8);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0.8rem 0.9rem 1.25rem;
+    }
+    .summary-box {
+      background: linear-gradient(160deg, #ffffff, #f3f7fd);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.75rem 0.85rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.84rem;
+      line-height: 1.45;
+      color: var(--navy);
+      box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset;
+    }
+    .summary-box.empty { color: var(--muted); }
+    .summary-box .summary-takeaway { font-weight: 600; }
+    .summary-box .summary-counts {
+      margin-top: 0.4rem;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 500;
+    }
+    .summary-box details { margin-top: 0.5rem; }
+    .summary-box summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: var(--blue);
+    }
+    .summary-box .full-report {
+      margin-top: 0.5rem;
+      max-height: 12rem;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      white-space: pre-wrap;
+      color: #243352;
+      background: #f7f9fc;
+      border-radius: 8px;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid var(--line);
+    }
+    .counts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-bottom: 0.7rem;
+    }
+    .chip {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      background: #e8eef8;
+      color: var(--muted);
+    }
+    .chip.promising { background: rgba(13, 175, 152, 0.16); color: #067a6b; }
+    .chip.conditional { background: rgba(243, 171, 71, 0.22); color: #8a5a12; }
+    .chip.avoid { background: rgba(223, 90, 103, 0.16); color: #a33a46; }
+    .banner {
+      display: none;
+      margin-bottom: 0.65rem;
+      padding: 0.55rem 0.7rem;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+    .banner.show { display: block; }
+    .banner.info { background: var(--accent-soft); color: #1e3f9a; }
+    .banner.warn { background: rgba(243, 171, 71, 0.22); color: #8a5a12; }
+    .banner.error { background: rgba(223, 90, 103, 0.16); color: #a33a46; }
+    .banner.loading { background: #e8eef8; color: #334155; }
+    .stage-progress {
+      display: none;
+      margin: -0.15rem 0 0.7rem;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+    .stage-progress.show { display: block; }
+    .stage-progress-head { display: flex; justify-content: space-between; gap: .5rem; margin-bottom: .3rem; }
+    .stage-progress-track { height: 5px; overflow: hidden; border-radius: 99px; background: #dce4f0; }
+    .stage-progress-fill {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--blue), var(--teal));
+      transition: width .25s ease;
+    }
+    .section-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin: 0.55rem 0 0.4rem;
+    }
+    .cards { display: flex; flex-direction: column; gap: 0.5rem; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 0.7rem 0.8rem;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+      min-width: 0;
+      box-shadow: 0 1px 2px rgba(23, 38, 66, 0.04);
+    }
+    .card:hover {
+      border-color: color-mix(in srgb, var(--blue) 35%, var(--line));
+      transform: translateY(-1px);
+    }
+    .card.selected {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 22%, transparent);
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      align-items: flex-start;
+    }
+    .card-title {
+      font-weight: 700;
+      font-size: 0.94rem;
+      line-height: 1.25;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: var(--navy);
+    }
+    .card-sub {
+      color: var(--muted);
+      font-size: 0.75rem;
+      margin-top: 0.15rem;
+    }
+    .badge {
+      flex: 0 0 auto;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      padding: 0.18rem 0.4rem;
+      border-radius: 6px;
+    }
+    .badge.overlap { background: rgba(223, 90, 103, 0.18); color: #a33a46; }
+    .badge.nearby { background: rgba(243, 171, 71, 0.22); color: #8a5a12; }
+    .badge.known { background: rgba(53, 109, 243, 0.14); color: #2452bd; }
+    .badge.meter { background: rgba(13, 175, 152, 0.15); color: #067a6b; }
+    .badge.unknown { background: #e2e8f0; color: #475569; }
+    .card-why {
+      margin-top: 0.4rem;
+      font-size: 0.78rem;
+      color: #465774;
+      line-height: 1.35;
+    }
+    .card-actions { margin-top: 0.45rem; }
+    .linkish {
+      border: none;
+      background: none;
+      color: var(--blue);
+      font: inherit;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+    }
+    .linkish:hover { text-decoration: underline; }
+    .more-note { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
+    .empty { color: var(--muted); font-size: 0.85rem; padding: 0.5rem 0; }
+
+    .map-pane {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      background: #c5d0e0;
+    }
+    #map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .map-fab {
+      position: absolute;
+      z-index: 500;
+      left: 0.75rem;
+      bottom: 0.75rem;
+      display: none;
+      gap: 0.35rem;
+    }
+    .map-legend, .layer-control {
+      position: absolute;
+      z-index: 500;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      box-shadow: var(--shadow);
+      padding: 0.55rem 0.65rem;
+      font-size: 0.7rem;
+      color: var(--navy);
+      backdrop-filter: blur(6px);
+    }
+    .map-legend { left: 0.75rem; top: 0.75rem; }
+    .layer-control { right: 0.75rem; top: 0.75rem; display: grid; gap: 0.35rem; }
+    .layer-control label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+    .legend-row { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.25rem; }
+    .legend-line { width: 1.7rem; height: 0; border-top: 4px solid; border-radius: 4px; }
+    .legend-line.restricted { border-color: var(--coral); }
+    .legend-line.nearby { border-color: var(--amber); }
+    .legend-line.lead { border-color: var(--teal); }
+    .legend-dot {
+      width: .8rem; height: .8rem; border-radius: 50%; background: var(--blue);
+      border: 2px solid var(--navy); box-shadow: 0 0 0 2px #fff;
+    }
+    .meter-pin-shell { background: none; border: 0; }
+    .meter-pin {
+      width: 24px; height: 24px; display: grid; place-items: center;
+      border-radius: 50%; color: #fff; background: var(--blue);
+      border: 3px solid var(--navy); box-shadow: 0 0 0 2px #fff, 0 3px 8px rgba(23,38,66,.35);
+      font-size: 12px; font-weight: 800; line-height: 1;
+      transition: transform .12s ease;
+    }
+    .meter-pin:hover { transform: scale(1.18); }
+    .legend-line.unknown { border-color: var(--amber); border-top-style: dashed; }
+    .approx-note { margin-top: 0.35rem; color: var(--muted); max-width: 14rem; line-height: 1.25; }
+    .mobile-toggle {
+      display: none;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 0.45rem 0.85rem;
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+    }
+
+    /* —— Evidence drawer (overlay; does not shrink map permanently) —— */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(23, 38, 66, 0.32);
+      z-index: calc(var(--z-drawer) - 1);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(var(--drawer-w), 100vw);
+      max-width: 100vw;
+      background: #fff;
+      z-index: var(--z-drawer);
+      box-shadow: var(--shadow);
+      transform: translate3d(105%, 0, 0);
+      transition: transform 0.22s ease;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .drawer.open { transform: translate3d(0, 0, 0); }
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--line);
+      flex: 0 0 auto;
+    }
+    .drawer-head h2 { font-size: 1rem; font-weight: 700; color: var(--navy); }
+    .drawer-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0.85rem 1rem 1.5rem;
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+    .drawer-body h3 {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin: 0.85rem 0 0.35rem;
+    }
+    .drawer-body h3:first-child { margin-top: 0; }
+    .drawer-body pre {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid var(--line);
+    }
+    .icon-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      width: 2rem;
+      height: 2rem;
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    /* —— Research activity sheet —— */
+    .activity-sheet {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      transform: translate(-50%, 110%);
+      width: min(520px, calc(100vw - 1.5rem));
+      max-height: min(50vh, 28rem);
+      background: #fff;
+      border-radius: 14px 14px 0 0;
+      box-shadow: var(--shadow);
+      z-index: var(--z-sheet);
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.22s ease;
+      border: 1px solid var(--line);
+      border-bottom: none;
+    }
+    .activity-sheet.open { transform: translate(-50%, 0); }
+    .activity-sheet .drawer-head { padding: 0.7rem 0.9rem; }
+    .activity-sheet .drawer-body { padding: 0.5rem 0.9rem 1rem; }
+    #activity-list {
+      list-style: none;
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    #activity-list .agent { font-weight: 700; color: var(--blue); }
+    #activity-list .error { color: var(--coral); }
+    #activity-list li { padding: 0.2rem 0; border-bottom: 1px solid #f1f5f9; }
+    .status-pill {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .leaflet-container { font: inherit; }
+    .marker-label { background: transparent; border: none; }
+    .timeline { display: grid; gap: 0.55rem; }
+    .timeline-item { border-left: 4px solid var(--amber); padding: 0.1rem 0 0.1rem 0.65rem; }
+    .timeline-item.restricted { border-color: var(--coral); }
+    .timeline-time { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+    .detail-callout { border-radius: 10px; padding: 0.7rem; background: var(--accent-soft); color: #1e3f9a; }
+    .detail-callout.restricted { background: rgba(223,90,103,.12); color: #8e2935; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
+    .detail-stat { border: 1px solid var(--line); border-radius: 9px; padding: 0.55rem; }
+    .detail-stat small { display: block; color: var(--muted); margin-bottom: 0.15rem; }
+    .drawer-body details { border-top: 1px solid var(--line); padding-top: 0.55rem; margin-top: 0.7rem; }
+    .drawer-body details summary { cursor: pointer; font-weight: 700; color: var(--blue); }
+    .skeleton { height: 5rem; border-radius: 12px; margin-bottom: .5rem; background: linear-gradient(90deg,#e8edf5 25%,#f6f8fb 50%,#e8edf5 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* —— Responsive —— */
+    @media (max-width: 1280px) {
+      form#search {
+        grid-template-columns: minmax(10rem, 1.6fr) repeat(3, minmax(6.5rem, 1fr)) minmax(5.5rem, 0.7fr) minmax(9rem, 1.1fr) auto;
+      }
+    }
+    @media (max-width: 1100px) {
+      :root { --sidebar-w: 360px; --drawer-w: 380px; }
+      .brand span { display: none; }
+      form#search {
+        grid-template-columns: 1.4fr 1fr 1fr;
+      }
+      form#search .field.dest { grid-column: 1 / -1; }
+      form#search .field.rad { grid-column: 1 / 3; }
+      form#search #run { grid-column: 3 / 4; }
+    }
+    @media (max-width: 900px) {
+      .workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr);
+      }
+      .sidebar {
+        position: absolute;
+        z-index: 600;
+        left: 0; right: 0; bottom: 0;
+        height: min(48vh, 28rem);
+        border-right: none;
+        border-top: 1px solid var(--line);
+        border-radius: 14px 14px 0 0;
+        box-shadow: 0 -8px 24px rgba(23, 38, 66, 0.1);
+        transform: translateY(0);
+        transition: transform 0.2s ease;
+      }
+      .sidebar.collapsed-mobile { transform: translateY(calc(100% - 3rem)); }
+      .map-fab { display: flex; }
+      .mobile-toggle { display: inline-flex; }
+      .drawer {
+        top: auto;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: min(78dvh, 36rem);
+        max-height: 85dvh;
+        border-radius: 14px 14px 0 0;
+        transform: translate3d(0, 105%, 0);
+      }
+      .drawer.open { transform: translate3d(0, 0, 0); }
+      .map-legend { top: .55rem; left: .55rem; }
+      .layer-control { top: .55rem; right: .55rem; }
+      form#search {
+        grid-template-columns: 1fr 1fr;
+      }
+      form#search .field.dest,
+      form#search .field.rad,
+      form#search #run { grid-column: 1 / -1; }
+    }
+    @media (max-width: 640px) {
+      .ghost-btn { padding: 0.4rem 0.5rem; font-size: 0.7rem; }
+      #btn-advanced { max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; }
+      .topbar { padding: .5rem .6rem .6rem; }
+      .topbar-row { margin-bottom: .4rem; }
+      .brand span { display: none; }
+      form#search { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .35rem; }
+      form#search .field.dest { grid-column: 1 / -1; }
+      form#search .field.date { grid-column: 1 / 3; }
+      form#search .field.time { grid-column: 3 / 5; }
+      form#search .field.dur { grid-column: 1 / 2; }
+      form#search .field.rad { grid-column: 2 / 4; }
+      form#search .field.vehicle { grid-column: 4 / 5; }
+      form#search #run { grid-column: 1 / -1; height: 2.15rem; }
+      .field label { font-size: .58rem; }
+      .field input, .field select { height: 2.15rem; padding: .4rem .5rem; font-size: .8rem; }
+      .now-btn { padding: 0 .35rem; font-size: .65rem; }
+      .map-legend .approx-note { display: none; }
+      .map-legend { max-width: 205px; padding: .4rem .45rem; font-size: .62rem; }
+      .map-legend strong, .map-legend .legend-unknown { display: none; }
+      .map-legend .legend-row { gap: .25rem; margin-top: .14rem; }
+      .map-legend .legend-line { width: 1.2rem; border-top-width: 3px; }
+      .layer-control { top: auto; bottom: 3.7rem; }
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-row">
+        <div class="brand">CurbWise<span>Find street parking near your destination</span></div>
+        <div class="header-actions">
+          <button type="button" class="ghost-btn" id="btn-activity" aria-expanded="false">Research activity</button>
+          <button type="button" class="ghost-btn" id="btn-advanced" aria-expanded="false">Advanced context</button>
+        </div>
+      </div>
+      <form id="search" autocomplete="off">
+        <div class="field dest">
+          <label for="destination">Destination</label>
+          <input id="destination" name="destination" placeholder="Address or place" value="Columbia University" required />
+          <div id="suggest" class="suggest" role="listbox"></div>
+        </div>
+        <div class="field date">
+          <label for="arrival_date">Arrival date</label>
+          <input id="arrival_date" type="date" value="2026-11-18" required />
+        </div>
+        <div class="field time">
+          <label for="arrival_time">Arrival time</label>
+          <div class="time-row">
+            <input id="arrival_time" type="time" value="10:00" required />
+            <button type="button" class="now-btn" id="now-btn" title="Use current New York time">Now</button>
+          </div>
+        </div>
+        <div class="field dur">
+          <label for="duration_hours">Duration (hrs)</label>
+          <input id="duration_hours" type="number" min="0.25" step="0.25" value="2" required />
+        </div>
+        <div class="field rad">
+          <label for="radius_m">Search radius</label>
+          <select id="radius_m" name="radius_m" required>
+            <option value="250">250 m — Very close</option>
+            <option value="500" selected>500 m — Nearby</option>
+            <option value="750">750 m — Wider search</option>
+            <option value="1000">1000 m — Extended search</option>
+            <option value="1500">1500 m — Maximum range</option>
+          </select>
+        </div>
+        <div class="field vehicle">
+          <label for="vehicle_category">Vehicle</label>
+          <select id="vehicle_category">
+            <option value="passenger" selected>Passenger</option>
+            <option value="commercial">Commercial</option>
+          </select>
+        </div>
+        <button id="run" type="submit">Research</button>
+      </form>
+    </header>
+
+    <div class="workspace">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-scroll">
+          <div id="summary" class="summary-box empty">Search to compare nearby street sides and known restrictions.</div>
+          <div id="counts" class="counts"></div>
+          <div id="banner" class="banner" role="status"></div>
+          <div id="stage-progress" class="stage-progress" aria-live="polite">
+            <div class="stage-progress-head">
+              <span id="stage-progress-label">Starting research</span>
+              <span id="stage-progress-count">0 of 6 checks</span>
+            </div>
+            <div class="stage-progress-track"><div id="stage-progress-fill" class="stage-progress-fill"></div></div>
+          </div>
+          <div id="cards" class="cards">
+            <p class="empty">No results yet.</p>
+          </div>
+        </div>
+      </aside>
+      <section class="map-pane" aria-label="Map">
+        <div id="map"></div>
+        <div class="map-legend" aria-label="Map legend">
+          <strong>Map findings</strong>
+          <div class="legend-row"><span class="legend-line restricted"></span> Restricted during stay</div>
+          <div class="legend-row"><span class="legend-line nearby"></span> Rule nearby / verify section</div>
+          <div class="legend-row"><span class="legend-line lead"></span> Known rule, no overlap</div>
+          <div class="legend-row"><span class="legend-dot"></span> Passenger meter</div>
+          <div class="legend-row legend-unknown"><span class="legend-line unknown"></span> Unknown (optional)</div>
+          <div class="approx-note">Lines are approximate centerline-side displays, not exact curb or space boundaries.</div>
+        </div>
+        <div class="layer-control" aria-label="Map layers">
+          <strong>Layers</strong>
+          <label><input type="checkbox" id="layer-streets" checked /> Known rules</label>
+          <label><input type="checkbox" id="layer-unknown" /> Unknown sides</label>
+          <label><input type="checkbox" id="layer-meters" checked /> Passenger meters</label>
+          <label><input type="checkbox" id="layer-signs" /> Sign evidence</label>
+        </div>
+        <div class="map-fab">
+          <button type="button" class="mobile-toggle" id="toggle-list">Show list</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+  <aside class="drawer" id="drawer" aria-hidden="true" role="dialog" aria-labelledby="drawer-title">
+    <div class="drawer-head">
+      <h2 id="drawer-title">Details</h2>
+      <button type="button" class="icon-btn" id="drawer-close" aria-label="Close details">×</button>
+    </div>
+    <div class="drawer-body" id="drawer-body" tabindex="-1"></div>
+  </aside>
+
+  <aside class="activity-sheet" id="activity-sheet" aria-hidden="true">
+    <div class="drawer-head">
+      <h2>Research activity <span class="status-pill" id="run-status"></span></h2>
+      <button type="button" class="icon-btn" id="activity-close" aria-label="Close activity">×</button>
+    </div>
+    <div class="drawer-body">
+      <ol id="activity-list"><li class="empty">Live agent steps appear here during a search.</li></ol>
+    </div>
+  </aside>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/context-panel.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let source = null;
+    let runId = null;
+    let results = null;
+    let selectedId = null;
+    let writerMarkdown = "";
+    const markersById = new Map();
+    let destMarker = null;
+    let streetLayer = null;
+    let unknownStreetLayer = null;
+    let meterLayer = null;
+    let signLayer = null;
+    let listCollapsed = false;
+
+    // Context overlay closed by default; never leave body-margin layout effects.
+    if (typeof setContextPanelOpen === "function") setContextPanelOpen(false);
+
+    const map = L.map("map", { zoomControl: true }).setView([40.7128, -74.006], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+    streetLayer = L.layerGroup().addTo(map);
+    unknownStreetLayer = L.layerGroup();
+    meterLayer = L.layerGroup();
+    signLayer = L.layerGroup();
+
+    function invalidateMapSoon() {
+      requestAnimationFrame(() => {
+        map.invalidateSize({ animate: false });
+        setTimeout(() => map.invalidateSize({ animate: false }), 220);
+      });
+    }
+    window.addEventListener("resize", invalidateMapSoon);
+    window.__curbwiseOnContextPanelToggle = (open) => {
+      $("btn-advanced").setAttribute("aria-expanded", open ? "true" : "false");
+      invalidateMapSoon();
+      if (!open) {
+        try { $("btn-advanced").focus({ preventScroll: true }); } catch (_) { /* ignore */ }
+      }
+    };
+
+    function assessmentColor(c) {
+      const category = c?.user_summary?.display_category;
+      if (category === "STRONG_RESTRICTION") return "#DF5A67";
+      if (category === "NEARBY_RESTRICTION") return "#F3AB47";
+      if (category === "METER_LEAD") return "#0DAF98";
+      if (category === "KNOWN_RULE") return "#356DF3";
+      return "#64748b";
+    }
+    function assessmentDash(c) {
+      const category = c?.user_summary?.display_category;
+      if (category === "NEARBY_RESTRICTION") return "10 5";
+      return category && category !== "UNKNOWN" ? null : "7 7";
+    }
+    function hasUsefulMapFinding(c) {
+      return c?.user_summary?.display_category
+        && c.user_summary.display_category !== "UNKNOWN";
+    }
+    function displayLabel(c) {
+      return c?.user_summary?.display_status || "No usable sign rule";
+    }
+    function displayBadgeClass(c) {
+      const category = c?.user_summary?.display_category;
+      if (category === "STRONG_RESTRICTION") return "overlap";
+      if (category === "NEARBY_RESTRICTION") return "nearby";
+      if (category === "KNOWN_RULE") return "known";
+      if (category === "METER_LEAD") return "meter";
+      return "unknown";
+    }
+    function circleIcon(status, selected) {
+      const color = status === "AVOID" ? "#DF5A67" : status === "NO_USEFUL_EVIDENCE" ? "#F3AB47" : "#356DF3";
+      const size = selected ? 18 : 12;
+      const ring = selected ? "0 0 0 3px rgba(15,118,110,0.35)" : "0 1px 4px rgba(0,0,0,.35)";
+      return L.divIcon({
+        className: "marker-label",
+        html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:${ring}"></div>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+      });
+    }
+
+    function showBanner(text, kind = "info") {
+      const el = $("banner");
+      el.className = `banner show ${kind}`;
+      el.textContent = text;
+    }
+    function clearBanner() {
+      $("banner").className = "banner";
+      $("banner").textContent = "";
+    }
+
+    function friendlyProgress(agent, text) {
+      const t = (text || "").toLowerCase();
+      const a = (agent || "").toLowerCase();
+      if (t.includes("geocode") || t.includes("candidate")) return "Mapping nearby street sides";
+      if (a.includes("meter") || t.includes("meter")) return "Checking meter rules";
+      if (a.includes("sign") || t.includes("sign")) return "Checking signs";
+      if (a.includes("exception") || t.includes("asp") || t.includes("closure") || t.includes("restriction")) return "Reviewing parking restrictions";
+      if (a.includes("evaluat") || t.includes("classif") || t.includes("lead")) return "Comparing leads";
+      if (a.includes("writer") || t.includes("writer") || t.includes("report")) return "Preparing recommendations";
+      if (a.includes("ui payload")) return "Preparing recommendations";
+      return null;
+    }
+
+    const stageDefinitions = [
+      ["discovery", "Finding nearby streets and meters"],
+      ["signs", "Checking parking signs"],
+      ["meters", "Checking meter schedules"],
+      ["exceptions", "Reviewing ASP and temporary restrictions"],
+      ["ranking", "Ranking results"],
+      ["recommendations", "Preparing recommendations"],
+    ];
+    let completedStages = new Set();
+
+    function resetStageProgress() {
+      completedStages = new Set();
+      $("stage-progress").classList.add("show");
+      renderStageProgress("Finding nearby streets and meters");
+    }
+
+    function renderStageProgress(activeLabel) {
+      const count = completedStages.size;
+      const next = stageDefinitions.find(([key]) => !completedStages.has(key));
+      $("stage-progress-label").textContent = activeLabel || next?.[1] || "Research complete";
+      $("stage-progress-count").textContent = `${count} of ${stageDefinitions.length} checks`;
+      $("stage-progress-fill").style.width = `${(count / stageDefinitions.length) * 100}%`;
+    }
+
+    function updateStageProgress(agent, text) {
+      const a = (agent || "").toLowerCase();
+      const t = (text || "").toLowerCase();
+      let active = friendlyProgress(agent, text);
+      if (t.includes("completed geocode_and_list_candidates")) completedStages.add("discovery");
+      if ((a.includes("sign") && t.includes("finished")) || t.includes("completed fetch_sign_evidence")) completedStages.add("signs");
+      if ((a.includes("meter") && t.includes("finished")) || t.includes("completed fetch_meter_evidence")) completedStages.add("meters");
+      if ((a.includes("exception") && t.includes("finished")) || t.includes("completed fetch_exception_evidence")) completedStages.add("exceptions");
+      if (a.includes("evaluator") || t.includes("completed run_deterministic_evaluation")) completedStages.add("ranking");
+      if (
+        (a.includes("ui payload") && t.includes("finalized"))
+        || (a.includes("writer") && t.includes("finished"))
+      ) completedStages.add("recommendations");
+      renderStageProgress(active);
+    }
+
+    function addActivity(agent, text, cls = "") {
+      const list = $("activity-list");
+      const empty = list.querySelector(".empty");
+      if (empty) empty.remove();
+      const friendly = friendlyProgress(agent, text);
+      const li = document.createElement("li");
+      li.className = cls;
+      if (friendly) {
+        const strong = document.createElement("div");
+        strong.style.fontWeight = "600";
+        strong.textContent = friendly;
+        li.appendChild(strong);
+      }
+      const detail = document.createElement("details");
+      const sum = document.createElement("summary");
+      sum.textContent = (agent ? agent + ": " : "") + "raw event";
+      detail.appendChild(sum);
+      detail.append((agent ? agent + " — " : "") + (text || ""));
+      li.appendChild(detail);
+      list.appendChild(li);
+      list.parentElement.scrollTop = list.parentElement.scrollHeight;
+    }
+
+    function formatTime12(hhmm) {
+      if (!hhmm) return "";
+      const [h, m] = hhmm.split(":").map(Number);
+      const ampm = h >= 12 ? "PM" : "AM";
+      const hour = ((h + 11) % 12) + 1;
+      return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+    }
+
+    function shortReason(c) {
+      return c.user_summary?.primary_text
+        || "No usable parking-sign rule found for this street side.";
+    }
+
+    function requestedConsequence(c) {
+      return c.user_summary?.consequence
+        || "Absent sign evidence is not a positive parking recommendation.";
+    }
+
+    function nextAction(c) {
+      return c.user_summary?.next_step
+        || "Read all physical signs for the exact street side before parking.";
+    }
+
+    function dateTimeLabel(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit"
+      }).format(d);
+    }
+
+    function streetTitle(c) {
+      const sides = { N: "North side", S: "South side", E: "East side", W: "West side" };
+      if (c.on_street && c.side_of_street) return `${c.on_street} — ${sides[c.side_of_street] || c.side_of_street}`;
+      if (c.on_street) return c.on_street;
+      return "Street not listed in meter record";
+    }
+
+    function openDrawer(c) {
+      renderDrawer(c);
+      $("drawer").classList.add("open");
+      $("drawer").setAttribute("aria-hidden", "false");
+      $("drawer-backdrop").hidden = false;
+      $("drawer-backdrop").classList.add("open");
+      $("drawer-close").focus();
+      invalidateMapSoon();
+    }
+    function closeDrawer() {
+      $("drawer").classList.remove("open");
+      $("drawer").setAttribute("aria-hidden", "true");
+      $("drawer-backdrop").classList.remove("open");
+      setTimeout(() => { $("drawer-backdrop").hidden = true; }, 200);
+      invalidateMapSoon();
+    }
+
+    function openActivity(open) {
+      $("activity-sheet").classList.toggle("open", open);
+      $("activity-sheet").setAttribute("aria-hidden", open ? "false" : "true");
+      $("btn-activity").setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    function selectCandidate(id, { fromMap, openDetails } = {}) {
+      selectedId = id;
+      document.querySelectorAll(".card").forEach((el) => {
+        el.classList.toggle("selected", el.dataset.id === id);
+      });
+      markersById.forEach((marker, mid) => {
+        const c = (results?.candidates || []).find((x) => x.candidate_id === mid);
+        if (typeof marker.setStyle === "function") {
+          marker.setStyle({
+            color: assessmentColor(c),
+            weight: mid === id ? 9 : 6,
+            opacity: mid === id ? 1 : .82,
+            dashArray: assessmentDash(c),
+          });
+          if (mid === id && typeof marker.bringToFront === "function") marker.bringToFront();
+        } else if (typeof marker.setIcon === "function") {
+          marker.setIcon(circleIcon(c?.lead_status, mid === id));
+        }
+      });
+      const c = (results?.candidates || []).find((x) => x.candidate_id === id);
+      if (!c) return;
+      if (!fromMap && c.lat != null && c.lon != null) {
+        map.panTo([c.lat, c.lon], { animate: true });
+      }
+      const card = document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+      if (card && !fromMap) card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      if (openDetails) openDrawer(c);
+    }
+
+    function renderDrawer(c) {
+      $("drawer-title").textContent = streetTitle(c);
+      const matched = (c.matched_signs || []);
+      const unmatched = (c.unmatched_nearby_signs || []);
+      const rules = c.plain_rule_findings || [];
+      const request = results?.request || {};
+      const requestLabel = request.arrival && request.departure
+        ? `${dateTimeLabel(request.arrival)} – ${dateTimeLabel(request.departure)}`
+        : "Requested parking interval";
+      const sourceLinks = (c.supporting_sources || []).map((s) =>
+        `<li><a href="${escapeText(s.url || "#")}" target="_blank" rel="noopener">${escapeText(s.id || "Official source")}</a></li>`
+      ).join("");
+      const ruleList = rules.length
+        ? rules.map((rule) => {
+            return `<div class="timeline-item ${rule.overlaps_stay ? "restricted" : ""}">
+              <strong>${escapeText(rule.summary)}</strong>
+              <div>${escapeText(rule.consequence)}</div>
+            </div>`;
+          }).join("")
+        : `<div class="timeline-item"><strong>No usable parking-sign rule found for this street side.</strong>
+            <div>Absent evidence is not a positive parking recommendation.</div></div>`;
+      const crossStreets = c.cross_streets_reliable && (c.from_street || c.to_street)
+        ? [c.from_street, c.to_street].filter(Boolean).join(" to ")
+        : "Cross streets not reliably established";
+
+      $("drawer-body").innerHTML = `
+        <h3>Street and requested stay</h3>
+        <div class="detail-grid">
+          <div class="detail-stat"><small>Location</small><strong>${escapeText(crossStreets)}</strong></div>
+          <div class="detail-stat"><small>Requested stay</small><strong>${escapeText(requestLabel)}</strong></div>
+        </div>
+
+        <h3>Known parking rules</h3>
+        <div class="timeline">${ruleList}</div>
+
+        <h3>Passenger meter</h3>
+        <p><strong>${escapeText(c.meter_summary?.summary || "No associated NYC meter record.")}</strong></p>
+        <p>${escapeText(c.meter_summary?.consequence || "")}</p>
+
+        <h3>Verify before parking</h3>
+        <p>${escapeText(nextAction(c))}</p>
+        <p class="approx-note">Known records do not establish physical space availability. Confirm the exact curb coverage and temporary postings on site.</p>
+
+        <details>
+          <summary>Research evidence</summary>
+          <h3>Original sign records (${matched.length})</h3>
+          ${matched.length ? matched.map((s) => `<p><strong>${escapeText(s.order_number || "Sign record")}</strong><br>${escapeText(s.sign_description || "No description")}<br><small>${escapeText(s.on_street || "")} ${escapeText(s.side_of_street || "")}</small></p>`).join("") : "<p>No associated sign observations.</p>"}
+          ${unmatched.length ? `<p><small>${unmatched.length} nearby opposite-side or different-street observation(s) were excluded.</small></p>` : ""}
+          <h3>Meter record</h3>
+          <p>${c.meter_number ? `Meter ${escapeText(c.meter_number)} · ` : ""}${escapeText(c.meter_summary?.summary || c.metering_basis || "No associated meter record.")}</p>
+          <h3>Official sources</h3>
+          <ul>${sourceLinks || "<li>No source link attached to this classification.</li>"}</ul>
+          <h3>Geographic interpretation</h3>
+          <p>Physical ID ${escapeText(c.physical_id || "n/a")} · Blockface ID ${escapeText(c.blockface_id || "n/a")}</p>
+          <p>${c.geometry_is_approximate ? "Displayed line is an approximate offset from a road-bed centerline, not a precise curb boundary." : "Location geometry comes from the cited source."}</p>
+          <p>${escapeText((c.legal_limitations || []).join(" ") || "No additional limitation recorded.")}</p>
+        </details>
+      `;
+    }
+
+    function escapeText(s) {
+      return String(s ?? "").replace(/[<>&]/g, (ch) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[ch]));
+    }
+
+    function renderSummary(payload, markdown) {
+      const el = $("summary");
+      el.className = "summary-box";
+      const dest = payload.destination?.label || "your destination";
+      const candidates = payload.candidates || [];
+      const overlap = candidates.filter((c) => c.user_summary?.primary_rule?.overlaps_stay).length;
+      const known = candidates.filter((c) => c.user_summary?.has_meaningful_finding && !c.user_summary?.primary_rule?.overlaps_stay).length;
+      const meter = candidates.filter((c) => !c.user_summary?.has_meaningful_finding && c.meter_summary?.supports_requested_stay).length;
+      const unknown = candidates.length - overlap - known - meter;
+      const takeaway = overlap || known
+        ? `${overlap + known} street side${overlap + known === 1 ? "" : "s"} near ${dest} have parsed parking-sign rules.`
+        : meter
+        ? `${meter} passenger-meter lead${meter === 1 ? "" : "s"} found near ${dest}, but no usable associated sign rule was established.`
+        : `No usable parking-sign rules were established near ${dest}. Check physical signs or adjust the search.`;
+      el.innerHTML = `
+        <div class="summary-takeaway">${escapeText(takeaway)}</div>
+        <div class="summary-counts">
+          ${overlap} overlap the stay · ${known} known rules do not overlap · ${meter} meter-only leads · ${unknown} unknown
+        </div>
+        <details>
+          <summary>Full research report</summary>
+          <div class="full-report">${escapeText(markdown || "(No writer report for this run.)")}</div>
+        </details>`;
+    }
+
+    function renderCards(payload) {
+      const rows = [...(payload.candidates || [])].sort((a, b) => {
+        const rank = (c) => c.user_summary?.primary_rule?.overlaps_stay ? 0
+          : c.user_summary?.has_meaningful_finding ? 1
+          : c.meter_summary?.supports_requested_stay ? 2 : 3;
+        return rank(a) - rank(b) || (a.distance_m ?? 1e9) - (b.distance_m ?? 1e9);
+      });
+      const overlap = rows.filter((c) => c.user_summary?.primary_rule?.overlaps_stay).length;
+      const known = rows.filter((c) => c.user_summary?.has_meaningful_finding && !c.user_summary?.primary_rule?.overlaps_stay).length;
+      const unknown = rows.filter((c) => !c.user_summary?.has_meaningful_finding && !c.meter_summary?.supports_requested_stay).length;
+      $("counts").innerHTML = `
+        <span class="chip avoid">Stay overlap ${overlap}</span>
+        <span class="chip promising">Known rules ${known}</span>
+        <span class="chip conditional">Unknown ${unknown}</span>`;
+
+      const frag = document.createDocumentFragment();
+      const grouped = new Map();
+      for (const c of rows) {
+        const street = c.on_street || "Street name unavailable";
+        if (!grouped.has(street)) grouped.set(street, []);
+        grouped.get(street).push(c);
+      }
+      let any = false;
+      for (const [street, list] of grouped) {
+        any = true;
+        const h = document.createElement("div");
+        h.className = "section-label";
+        h.textContent = street;
+        frag.appendChild(h);
+        for (const c of list) frag.appendChild(cardEl(c));
+      }
+      $("cards").replaceChildren(
+        any ? frag : Object.assign(document.createElement("p"), { className: "empty", textContent: "No street-side candidates returned." })
+      );
+    }
+
+    function cardEl(c) {
+      const el = document.createElement("article");
+      el.className = "card";
+      el.dataset.id = c.candidate_id;
+      el.tabIndex = 0;
+      el.innerHTML = `
+        <div class="card-top">
+          <div style="min-width:0">
+            <div class="card-title">${escapeText(streetTitle(c))}</div>
+            <div class="card-sub">${c.distance_m != null ? Math.round(c.distance_m) + " m from destination" : "Distance unavailable"}</div>
+          </div>
+          <span class="badge ${displayBadgeClass(c)}">${escapeText(displayLabel(c))}</span>
+        </div>
+        <div class="card-why"><strong>${escapeText(shortReason(c))}</strong><br>${escapeText(requestedConsequence(c))}
+        <br>${escapeText(c.meter_summary?.summary || "No associated NYC meter record.")}
+        <br><strong>Next:</strong> ${escapeText(nextAction(c))}</div>
+        <div class="card-actions">
+          <button type="button" class="linkish" data-details>View details</button>
+          ${c.user_summary?.evidence_url ? ` · <a class="linkish" data-evidence href="${escapeText(c.user_summary.evidence_url)}" target="_blank" rel="noopener">Official evidence</a>` : ""}
+        </div>`;
+      el.addEventListener("click", (e) => {
+        if (e.target && e.target.closest("[data-evidence]")) {
+          e.stopPropagation();
+          return;
+        }
+        if (e.target && e.target.closest("[data-details]")) {
+          e.stopPropagation();
+          selectCandidate(c.candidate_id, { openDetails: true });
+          return;
+        }
+        selectCandidate(c.candidate_id);
+      });
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          selectCandidate(c.candidate_id);
+        }
+      });
+      return el;
+    }
+
+    function renderMap(payload, { preserveView } = {}) {
+      streetLayer.clearLayers();
+      unknownStreetLayer.clearLayers();
+      meterLayer.clearLayers();
+      signLayer.clearLayers();
+      markersById.clear();
+      const dest = payload.destination || {};
+      const bounds = [];
+      if (destMarker) {
+        map.removeLayer(destMarker);
+        destMarker = null;
+      }
+      if (typeof dest.lat === "number" && typeof dest.lon === "number") {
+        destMarker = L.marker([dest.lat, dest.lon], {
+          title: dest.label || "Destination",
+          zIndexOffset: 500,
+        }).addTo(map);
+        destMarker.bindPopup(`<strong>${dest.label || "Destination"}</strong><br/>Destination`);
+        bounds.push([dest.lat, dest.lon]);
+      }
+      const seenMeters = new Set();
+      const hasMeaningful = (payload.candidates || []).some(
+        (c) => hasUsefulMapFinding(c)
+      );
+      for (const c of payload.candidates || []) {
+        const geometry = c.display_geometry || c.geometry;
+        if (c.candidate_kind === "STREET_SIDE" && geometry) {
+          const targetLayer = hasUsefulMapFinding(c)
+            ? streetLayer : unknownStreetLayer;
+          const line = L.geoJSON(geometry, {
+            style: {
+              color: assessmentColor(c),
+              weight: c.candidate_id === selectedId ? 9 : 6,
+              opacity: .82,
+              dashArray: assessmentDash(c),
+              lineCap: "round",
+            },
+          }).addTo(targetLayer);
+          line.on("click", () => selectCandidate(c.candidate_id, { fromMap: true, openDetails: true }));
+          line.bindTooltip(`${streetTitle(c)} · ${shortReason(c)} ${requestedConsequence(c)}`, { sticky: true });
+          markersById.set(c.candidate_id, line);
+          const lineBounds = line.getBounds();
+          if (lineBounds.isValid() && (hasUsefulMapFinding(c) || !hasMeaningful)) {
+            bounds.push(lineBounds.getSouthWest(), lineBounds.getNorthEast());
+          }
+          if ((c.matched_signs || []).length) {
+            L.geoJSON(geometry, {
+              style: { color: "#6d4ad3", weight: 2, opacity: .9, dashArray: "2 7" },
+            }).bindTooltip(`${c.matched_signs.length} associated sign observation(s); exact curb scope may be unknown`).addTo(signLayer);
+          }
+        } else if (c.coordinates_trusted && c.lat != null && c.lon != null) {
+          const point = L.marker([c.lat, c.lon], {
+            icon: circleIcon(c.lead_status, c.candidate_id === selectedId),
+            title: streetTitle(c),
+          }).addTo(hasUsefulMapFinding(c) ? streetLayer : unknownStreetLayer);
+          point.on("click", () => selectCandidate(c.candidate_id, { fromMap: true, openDetails: true }));
+          point.bindTooltip(`${streetTitle(c)} · ${shortReason(c)}`);
+          markersById.set(c.candidate_id, point);
+          bounds.push([c.lat, c.lon]);
+        }
+        for (const meter of c.meter_observations || []) {
+          const meterKey = `${meter.meter_number || ""}:${meter.lat}:${meter.lon}`;
+          if (
+            !c.meter_summary?.has_passenger_schedule
+            || meter.lat == null || meter.lon == null
+            || seenMeters.has(meterKey)
+          ) continue;
+          seenMeters.add(meterKey);
+          const meterMarker = L.marker([meter.lat, meter.lon], {
+            icon: L.divIcon({
+              className: "meter-pin-shell",
+              html: '<div class="meter-pin" aria-hidden="true">P</div>',
+              iconSize: [30, 30],
+              iconAnchor: [15, 15],
+              popupAnchor: [0, -13],
+            }),
+            title: `Passenger meter ${meter.meter_number || ""}`,
+            zIndexOffset: 300,
+          }).bindTooltip(`Passenger meter ${meter.meter_number || ""}: ${c.meter_summary.summary}`, { sticky: true }).addTo(meterLayer);
+          const meterStatus = meter.status || "Status not reported";
+          const fit = c.meter_summary.supports_requested_stay
+            ? "Requested passenger stay fits the stated schedule."
+            : "The stated passenger schedule does not cover the full requested stay.";
+          meterMarker.bindPopup(`<strong>Passenger meter ${escapeText(meter.meter_number || "")}</strong><br><strong>Meter status:</strong> ${escapeText(meterStatus)}<br>${escapeText(c.meter_summary.summary)}<br>${escapeText(fit)}<hr><strong>Nearby street-side finding</strong><br>${escapeText(shortReason(c))}<br>${escapeText(requestedConsequence(c))}<br><small>A meter does not prove a vacant space or override posted signs.</small>`);
+          meterMarker.on("click", () => selectCandidate(c.candidate_id, { fromMap: true }));
+        }
+      }
+      if ($("layer-streets").checked && !map.hasLayer(streetLayer)) streetLayer.addTo(map);
+      if (!$("layer-streets").checked && map.hasLayer(streetLayer)) map.removeLayer(streetLayer);
+      if ($("layer-unknown").checked && !map.hasLayer(unknownStreetLayer)) unknownStreetLayer.addTo(map);
+      if (!$("layer-unknown").checked && map.hasLayer(unknownStreetLayer)) map.removeLayer(unknownStreetLayer);
+      if ($("layer-meters").checked && !map.hasLayer(meterLayer)) meterLayer.addTo(map);
+      if (!$("layer-meters").checked && map.hasLayer(meterLayer)) map.removeLayer(meterLayer);
+      if ($("layer-signs").checked && !map.hasLayer(signLayer)) signLayer.addTo(map);
+      if (!$("layer-signs").checked && map.hasLayer(signLayer)) map.removeLayer(signLayer);
+      invalidateMapSoon();
+      if (!preserveView && bounds.length) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+      }
+    }
+
+    function applyResults(payload, markdown, { preliminary = false } = {}) {
+      results = payload;
+      writerMarkdown = markdown || payload.explanation_markdown || "";
+      renderSummary(payload, writerMarkdown);
+      renderCards(payload);
+      renderMap(payload);
+      const first = (payload.candidates || []).find((c) => c.user_summary?.display_category === "STRONG_RESTRICTION")
+        || (payload.candidates || []).find((c) => c.user_summary?.display_category === "NEARBY_RESTRICTION")
+        || (payload.candidates || []).find((c) => c.user_summary?.has_meaningful_finding)
+        || (payload.candidates || []).find((c) => c.meter_summary?.supports_requested_stay)
+        || (payload.candidates || []).find((c) => c.coordinates_trusted);
+      if (first) selectCandidate(first.candidate_id);
+      if (preliminary) {
+        showBanner("Street-side findings are ready. Preparing the full research report…", "info");
+      } else {
+        clearBanner();
+      }
+    }
+
+    function finish(message) {
+      $("run-status").textContent = message;
+      $("run").disabled = false;
+      if (source) source.close();
+      source = null;
+    }
+
+    // Autocomplete
+    let suggestTimer = null;
+    $("destination").addEventListener("input", () => {
+      clearTimeout(suggestTimer);
+      const q = $("destination").value.trim();
+      if (q.length < 3) { $("suggest").classList.remove("open"); return; }
+      suggestTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/geocode/suggest?q=${encodeURIComponent(q)}&size=6`);
+          const data = await res.json();
+          const box = $("suggest");
+          box.replaceChildren();
+          (data.results || []).forEach((r) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.textContent = r.label || r.name;
+            b.addEventListener("click", () => {
+              $("destination").value = r.label || r.name;
+              box.classList.remove("open");
+            });
+            box.appendChild(b);
+          });
+          box.classList.toggle("open", (data.results || []).length > 0);
+        } catch (_) { /* ignore */ }
+      }, 250);
+    });
+    document.addEventListener("click", (e) => {
+      if (!$("suggest").contains(e.target) && e.target !== $("destination")) {
+        $("suggest").classList.remove("open");
+      }
+    });
+
+    $("drawer-close").addEventListener("click", closeDrawer);
+    $("drawer-backdrop").addEventListener("click", closeDrawer);
+    $("activity-close").addEventListener("click", () => openActivity(false));
+    $("btn-activity").addEventListener("click", () => {
+      const open = !$("activity-sheet").classList.contains("open");
+      openActivity(open);
+    });
+    $("btn-advanced").addEventListener("click", () => {
+      const next = !(typeof isContextPanelOpen === "function" && isContextPanelOpen());
+      if (typeof setContextPanelOpen === "function") setContextPanelOpen(next);
+      if (next && runId && typeof showContext === "function") showContext(runId);
+    });
+    $("toggle-list").addEventListener("click", () => {
+      listCollapsed = !listCollapsed;
+      $("sidebar").classList.toggle("collapsed-mobile", listCollapsed);
+      $("toggle-list").textContent = listCollapsed ? "Show list" : "Hide list";
+      invalidateMapSoon();
+    });
+    $("layer-streets").addEventListener("change", (e) => {
+      if (e.target.checked) streetLayer.addTo(map); else map.removeLayer(streetLayer);
+    });
+    $("layer-unknown").addEventListener("change", (e) => {
+      if (e.target.checked) unknownStreetLayer.addTo(map); else map.removeLayer(unknownStreetLayer);
+    });
+    $("layer-meters").addEventListener("change", (e) => {
+      if (e.target.checked) meterLayer.addTo(map); else map.removeLayer(meterLayer);
+    });
+    $("layer-signs").addEventListener("change", (e) => {
+      if (e.target.checked) signLayer.addTo(map); else map.removeLayer(signLayer);
+    });
+    $("now-btn").addEventListener("click", () => {
+      const parts = Object.fromEntries(
+        new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/New_York", year: "numeric", month: "2-digit",
+          day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+        }).formatToParts(new Date()).filter((p) => p.type !== "literal").map((p) => [p.type, p.value])
+      );
+      $("arrival_date").value = `${parts.year}-${parts.month}-${parts.day}`;
+      $("arrival_time").value = `${parts.hour}:${parts.minute}`;
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      // Context panel handles its own Escape; also close app overlays.
+      closeDrawer();
+      openActivity(false);
+    });
+
+    $("search").addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (source) { source.close(); source = null; }
+      clearBanner();
+      closeDrawer();
+      const destination = $("destination").value.trim();
+      const arrival_date = $("arrival_date").value;
+      const arrival_time = formatTime12($("arrival_time").value);
+      const duration_hours = $("duration_hours").value;
+      const radius_m = $("radius_m").value;
+      const vehicle_category = $("vehicle_category").value;
+      if (!destination || !arrival_date || !$("arrival_time").value || !duration_hours) {
+        showBanner("Please complete destination, date, time, and duration.", "warn");
+        return;
+      }
+      const vehicleLabel = vehicle_category === "commercial" ? "Commercial" : "Passenger";
+      const question = `I need to park near ${destination} on ${arrival_date} at ${arrival_time} for ${duration_hours} hours. ${vehicleLabel} vehicle.`;
+      const params = new URLSearchParams({
+        question, destination, arrival_date, arrival_time, duration_hours, radius_m,
+        vehicle_category, max_candidates: "18",
+      });
+
+      $("activity-list").replaceChildren();
+      addActivity("", "Understanding request");
+      resetStageProgress();
+      $("summary").className = "summary-box empty";
+      $("summary").textContent = "Research in progress… previous results stay on the map until new ones arrive.";
+      $("cards").innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+      showBanner("Building nearby street sides and checking restrictions…", "loading");
+      $("run-status").textContent = "running";
+      $("run").disabled = true;
+      selectedId = null;
+      if (typeof resetContext === "function") resetContext();
+
+      // Live SSE only — structured results come from the terminal done event.
+      source = new EventSource("/run?" + params);
+      source.onmessage = (msg) => {
+        const event = JSON.parse(msg.data);
+        if (event.type === "start") {
+          runId = event.run_id;
+          addActivity("", "Started run " + runId.slice(0, 8));
+        } else if (event.type === "context") {
+          if (typeof showContext === "function") showContext(runId);
+        } else if (event.type === "activity") {
+          addActivity(event.agent, event.text);
+          updateStageProgress(event.agent, event.text);
+        } else if (event.type === "results") {
+          if (event.results && (event.results.candidates || []).length) {
+            applyResults(event.results, "", { preliminary: true });
+            completedStages.add("ranking");
+            renderStageProgress("Preparing recommendations");
+          }
+        } else if (event.type === "done") {
+          if (event.incomplete) {
+            showBanner(event.markdown || "Request incomplete — need clearer date/time/duration.", "warn");
+            $("summary").textContent = event.markdown || "Incomplete request.";
+            finish("needs input");
+            return;
+          }
+          if (!event.results || !(event.results.candidates || []).length) {
+            showBanner("No structured street-side candidates returned from the live run.", "warn");
+            $("cards").replaceChildren(Object.assign(document.createElement("p"), { className: "empty", textContent: "No candidates." }));
+            finish("done");
+            return;
+          }
+          applyResults(event.results, event.markdown);
+          completedStages = new Set(stageDefinitions.map(([key]) => key));
+          renderStageProgress("Research complete");
+          finish("done");
+        } else if (event.type === "error") {
+          addActivity("", event.message, "error");
+          showBanner(event.message || "Research failed.", "error");
+          finish("failed");
+        }
+      };
+      source.onerror = () => {
+        addActivity("", "Lost the connection to the server.", "error");
+        showBanner("Lost connection to the server.", "error");
+        finish("failed");
+      };
+    });
+
+    invalidateMapSoon();
+  </script>
+</body>
+</html>
